@@ -1,7 +1,7 @@
 import os
-from rainbow.datafile import DataFile
-from rainbow.datadirectory import DataDirectory
-from rainbow import agilent, waters
+from .datafile import DataFile
+from .datadirectory import DataDirectory
+from . import agilent, waters
 
 
 def read(path, prec=0, hrms=False, requested_files=None):

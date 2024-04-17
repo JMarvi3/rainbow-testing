@@ -1,7 +1,7 @@
 import os
 
-from rainbow.agilent import chemstation
-from rainbow.datadirectory import DataDirectory
+from . import chemstation
+from ..datadirectory import DataDirectory
 
 
 def read(path, prec=0, hrms=False, requested_files=None):
