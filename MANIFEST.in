@@ -1,0 +1,4 @@
+include rainbow/*.py
+include rainbow/agilent/*.py
+include rainbow/waters/*.py
+include rainbow/*.c

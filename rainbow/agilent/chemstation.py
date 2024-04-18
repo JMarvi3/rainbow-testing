@@ -8,6 +8,7 @@ import struct
 import numpy as np
 from lxml import etree
 from rainbow.datafile import DataFile
+from .. import _rainbow
 
 """
 MAIN PARSING METHODS
@@ -333,30 +334,32 @@ def decode_double_delta(f, offset):
 
 
 def decode_uv_delta(f, data_offsets, num_times, num_wavelengths):
-    uint_unpack = struct.Struct('<I').unpack
-    int_unpack = struct.Struct('<i').unpack
-    short_unpack = struct.Struct('<h').unpack
-
-    f.seek(data_offsets["data_start"])
-    times = np.empty(num_times, dtype=np.uint32)
-    data = np.empty((num_times, num_wavelengths), dtype=np.int64)
-    for i in range(num_times):
-        f.read(4)
-        times[i] = uint_unpack(f.read(4))[0]
-        f.read(14)
-        # If the next short is equal to -0x8000
-        #     then the next absorbance value is the next integer.
-        # Otherwise, the short is a delta from the last absorbance value.
-        absorb_accum = 0
-        for j in range(num_wavelengths):
-            check_int = short_unpack(f.read(2))[0]
-            if check_int == -0x8000:
-                absorb_accum = int_unpack(f.read(4))[0]
-            else:
-                absorb_accum += check_int
-            data[i, j] = absorb_accum
-
-    return times, data
+    return _rainbow.decode_uv_delta(f, data_offsets["data_start"], num_times, num_wavelengths)
+    #
+    # uint_unpack = struct.Struct('<I').unpack
+    # int_unpack = struct.Struct('<i').unpack
+    # short_unpack = struct.Struct('<h').unpack
+    #
+    # f.seek(data_offsets["data_start"])
+    # times = np.empty(num_times, dtype=np.uint32)
+    # data = np.empty((num_times, num_wavelengths), dtype=np.int64)
+    # for i in range(num_times):
+    #     f.read(4)
+    #     times[i] = uint_unpack(f.read(4))[0]
+    #     f.read(14)
+    #     # If the next short is equal to -0x8000
+    #     #     then the next absorbance value is the next integer.
+    #     # Otherwise, the short is a delta from the last absorbance value.
+    #     absorb_accum = 0
+    #     for j in range(num_wavelengths):
+    #         check_int = short_unpack(f.read(2))[0]
+    #         if check_int == -0x8000:
+    #             absorb_accum = int_unpack(f.read(4))[0]
+    #         else:
+    #             absorb_accum += check_int
+    #         data[i, j] = absorb_accum
+    #
+    # return times, data
 
 
 def decode_uv_array(f, data_offsets, num_times, num_wavelengths):
@@ -607,57 +610,60 @@ def parse_ms(path, prec=0):
         f.seek(data_offsets['gc_num_times'])
         num_times = struct.unpack('<I', f.read(4))[0]
 
-    # Go to the data start offset.
-    f.seek(data_offsets['data_start'])
-    f.seek(short_unpack(f.read(2))[0] * 2 - 2)
+    if False:
+        times, ylabels, data = _rainbow.decode_ms(f, data_offsets['data_start'], num_times, prec)
+    else:
+        # Go to the data start offset.
+        f.seek(data_offsets['data_start'])
+        f.seek(short_unpack(f.read(2))[0] * 2 - 2)
 
-    # Extract retention times and data pair counts for each time. 
-    # Store the bytes holding mz-intensity pairs.
-    times = np.empty(num_times, dtype=np.uint32)
-    pair_counts = np.zeros(num_times, dtype=np.uint16)
-    pair_bytearr = bytearray()
-    for i in range(num_times):
-        f.read(2)
-        times[i] = int_unpack(f.read(4))[0]
-        f.read(6)
-        pair_counts[i] = short_unpack(f.read(2))[0]
-        f.read(4)
-        pair_bytes = f.read(pair_counts[i] * 4)
-        pair_bytearr.extend(pair_bytes)
-        f.read(10)
+        # Extract retention times and data pair counts for each time.
+        # Store the bytes holding mz-intensity pairs.
+        times = np.empty(num_times, dtype=np.uint32)
+        pair_counts = np.zeros(num_times, dtype=np.uint16)
+        pair_bytearr = bytearray()
+        for i in range(num_times):
+            f.read(2)
+            times[i] = int_unpack(f.read(4))[0]
+            f.read(6)
+            pair_counts[i] = short_unpack(f.read(2))[0]
+            f.read(4)
+            pair_bytes = f.read(pair_counts[i] * 4)
+            pair_bytearr.extend(pair_bytes)
+            f.read(10)
 
-    # Minor processing on the extracted data.
-    raw_bytes = bytes(pair_bytearr)
-    times = times / 60000
-    total_paircount = np.sum(pair_counts)
+        # Minor processing on the extracted data.
+        raw_bytes = bytes(pair_bytearr)
+        times = times / 60000
+        total_paircount = np.sum(pair_counts)
 
-    # Calculate the mz values. 
-    mzs = np.ndarray(total_paircount, '>H', raw_bytes, 0, 4)
-    mzs = np.round(mzs / 20, prec)
+        # Calculate the mz values.
+        mzs = np.ndarray(total_paircount, '>H', raw_bytes, 0, 4)
+        mzs = np.round(mzs / 20, prec)
 
-    # Calculate the intensity values. 
-    int_encs = np.ndarray(total_paircount, '>H', raw_bytes, 2, 4)
-    int_heads = int_encs >> 14
-    int_tails = int_encs & 0x3fff
-    int_values = np.multiply(8 ** int_heads, int_tails, dtype=np.uint32)
-    del int_encs, int_heads, int_tails, raw_bytes
+        # Calculate the intensity values.
+        int_encs = np.ndarray(total_paircount, '>H', raw_bytes, 2, 4)
+        int_heads = int_encs >> 14
+        int_tails = int_encs & 0x3fff
+        int_values = np.multiply(8 ** int_heads, int_tails, dtype=np.uint32)
+        del int_encs, int_heads, int_tails, raw_bytes
 
-    # Make the array of `ylabels` with mz values. 
-    ylabels = np.unique(mzs)
-    ylabels.sort()
+        # Make the array of `ylabels` with mz values.
+        ylabels = np.unique(mzs)
+        ylabels.sort()
 
-    # Make the `data` array with intensities. 
-    mz_indices = np.searchsorted(ylabels, mzs)
-    data = np.zeros((num_times, ylabels.size), dtype=np.uint32)
-    cur_index = 0
-    for i in range(num_times):
-        stop_index = cur_index + pair_counts[i]
-        np.add.at(
-            data[i],
-            mz_indices[cur_index:stop_index],
-            int_values[cur_index:stop_index])
-        cur_index = stop_index
-    del mz_indices, mzs, int_values, pair_counts
+        # Make the `data` array with intensities.
+        mz_indices = np.searchsorted(ylabels, mzs)
+        data = np.zeros((num_times, ylabels.size), dtype=np.uint32)
+        cur_index = 0
+        for i in range(num_times):
+            stop_index = cur_index + pair_counts[i]
+            np.add.at(
+                data[i],
+                mz_indices[cur_index:stop_index],
+                int_values[cur_index:stop_index])
+            cur_index = stop_index
+        del mz_indices, mzs, int_values, pair_counts
 
     # Read file metadata.
     metadata_offsets = {
