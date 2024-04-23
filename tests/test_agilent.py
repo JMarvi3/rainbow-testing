@@ -1,7 +1,8 @@
-import tests.datatester
+from datatester import DataTester
+import unittest
 
 
-class TestAgilent(tests.datatester.DataTester):
+class TestAgilent(DataTester):
     """
     Unit tests for parsing Agilent .D directories. 
 
@@ -61,6 +62,7 @@ class TestAgilent(tests.datatester.DataTester):
 
         """
         self._DataTester__test_data_directory("pink", "D")
+
 
 if __name__ == '__main__':
     unittest.main()

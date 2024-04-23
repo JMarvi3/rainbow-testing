@@ -1,7 +1,8 @@
-import tests.datatester
+import unittest
+from datatester import DataTester
 
 
-class TestWaters(tests.datatester.DataTester):
+class TestWaters(DataTester):
     """
     Unit tests for parsing Waters .raw directories. 
 
@@ -44,6 +45,7 @@ class TestWaters(tests.datatester.DataTester):
 
         """
         self._DataTester__test_data_directory("white", "raw")
+
 
 if __name__ == '__main__':
     unittest.main()

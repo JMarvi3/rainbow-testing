@@ -23,7 +23,7 @@ class DataTester(unittest.TestCase):
             outputs directory. 
 
         """
-        tests_path = Path("tests")
+        tests_path = Path("")  # Path("tests")
         json_path = tests_path / "outputs" / color / "info.json"
         with open(str(json_path)) as json_f:
             json_data = json.load(json_f)
